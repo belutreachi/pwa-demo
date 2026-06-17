@@ -1,4 +1,4 @@
-const CACHE_NAME = 'camdemo-v1';
+const CACHE_NAME = 'camdemo-v2';
 const ASSETS = [
   './',
   './index.html',
