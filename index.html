@@ -163,6 +163,26 @@
     .btn-card.red .label { color: #f87171; }
 
     input[type=file] { display: none; }
+
+    /* ─── Log ─── */
+    #log-section h2 { font-size: 0.75rem; font-weight: 600; color: var(--muted); letter-spacing: 0.08em; text-transform: uppercase; margin-bottom: 10px; }
+    #log {
+      background: var(--surface);
+      border-radius: var(--radius);
+      padding: 14px;
+      font-size: 0.75rem;
+      font-family: 'SF Mono', 'Menlo', monospace;
+      color: var(--muted);
+      max-height: 160px;
+      overflow-y: auto;
+      display: flex; flex-direction: column; gap: 4px;
+      border: 1.5px solid rgba(255,255,255,0.06);
+    }
+    .log-entry { display: flex; gap: 8px; }
+    .log-time  { color: var(--accent); flex-shrink: 0; }
+    .log-msg.ok   { color: var(--success); }
+    .log-msg.err  { color: #f87171; }
+    .log-msg.info { color: var(--text); }
   </style>
 </head>
 <body>
@@ -226,6 +246,11 @@
       <span class="label">Detener cámara</span>
     </div>
   </div>
+
+  <div id="log-section">
+    <h2>Registro de eventos</h2>
+    <div id="log"></div>
+  </div>
 </main>
 
 <input type="file" id="input-cam"     accept="image/*" capture="environment" />
@@ -248,7 +273,17 @@
   document.getElementById('dismiss-banner').onclick = () => banner.classList.add('hidden');
 
   if ('serviceWorker' in navigator) {
-    navigator.serviceWorker.register('./sw.js').catch(() => {});
+    navigator.serviceWorker.register('./sw.js')
+      .then(() => log('ok', 'Service Worker registrado'))
+      .catch(e => log('err', 'SW error: ' + e.message));
+  }
+
+  function log(type, msg) {
+    const t = new Date().toTimeString().slice(0,8);
+    const entry = document.createElement('div');
+    entry.className = 'log-entry';
+    entry.innerHTML = `<span class="log-time">${t}</span><span class="log-msg ${type}">${msg}</span>`;
+    document.getElementById('log').prepend(entry);
   }
 
   function showImage(blob) {
@@ -263,12 +298,14 @@
     video.classList.remove('visible');
     overlay.classList.remove('visible');
     stopSection.style.display = 'none';
+    log('info', 'Cámara detenida');
   }
 
   async function openCamera(facing) {
     stopCamera();
     placeholder.style.display = 'flex';
     previewImg.classList.remove('visible');
+    log('info', `Solicitando cámara ${facing === 'user' ? 'frontal' : 'trasera'}...`);
     try {
       stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: facing }, audio: false });
       video.srcObject = stream;
@@ -276,7 +313,9 @@
       overlay.classList.add('visible');
       placeholder.style.display = 'none';
       stopSection.style.display = 'grid';
+      log('ok', 'Cámara activa — presioná el botón blanco para capturar');
     } catch(e) {
+      log('err', 'Error cámara: ' + e.message);
       alert('No se pudo acceder a la cámara.\n\n' + e.message);
     }
   }
@@ -290,17 +329,18 @@
     canvas.toBlob(blob => { stopCamera(); showImage(blob); }, 'image/jpeg', 0.92);
   };
 
-  document.getElementById('btn-input-cam').onclick = () => { stopCamera(); document.getElementById('input-cam').click(); };
-  document.getElementById('btn-gallery').onclick   = () => { stopCamera(); document.getElementById('input-gallery').click(); };
+  document.getElementById('btn-input-cam').onclick = () => { stopCamera(); document.getElementById('input-cam').click(); log('info', 'Abriendo cámara nativa...'); };
+  document.getElementById('btn-gallery').onclick   = () => { stopCamera(); document.getElementById('input-gallery').click(); log('info', 'Abriendo galería...'); };
 
-  function handleFile(input) {
+  function handleFile(input, source) {
     input.onchange = () => {
       const file = input.files[0];
-      if (file) { showImage(file); input.value = ''; }
+      if (file) { showImage(file); log('ok', `Imagen recibida — ${(file.size/1024).toFixed(1)} KB`); input.value = ''; }
+      else { log('info', 'Selección cancelada'); }
     };
   }
-  handleFile(document.getElementById('input-cam'));
-  handleFile(document.getElementById('input-gallery'));
+  handleFile(document.getElementById('input-cam'), 'Cámara nativa');
+  handleFile(document.getElementById('input-gallery'), 'Galería');
 </script>
 </body>
 </html>
